@@ -580,6 +580,27 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     );
   }
 
+  bool isWithinFiveMinutes(DateTime date, String timeString, DateTime current) {
+    final timeFormat = DateFormat("hh:mm a");
+    final parsedTime = timeFormat.parse(timeString);
+
+    // Combine the passed date and parsed time
+    final combinedDateTime = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      parsedTime.hour,
+      parsedTime.minute,
+    );
+
+    // Create time window: 5 minutes before and after combined time
+    final fiveMinutesBefore = combinedDateTime.subtract(Duration(minutes: 5));
+    final fiveMinutesAfter = combinedDateTime.add(Duration(minutes: 5));
+
+    return current.isAfter(fiveMinutesBefore) &&
+        current.isBefore(fiveMinutesAfter);
+  }
+
   Widget _buildBreakTimesList() {
     if (breakTimes.isEmpty) return SizedBox.shrink();
 
@@ -896,6 +917,34 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                   child: ElevatedButton(
                                     onPressed: () async {
                                       // Handle clock in/out
+
+                                      if (widget.job.scheduleLogs!.isEmpty) {
+                                        if (!isWithinFiveMinutes(
+                                          DateTime.parse(widget.job.startDate!),
+                                          widget.job.startTime!,
+                                          clock!,
+                                        )) {
+                                          Customalerts.errorAlert(
+                                            title: "Can't Clock In",
+                                            body:
+                                                "Please clock in before/after of 5 minutes from start time",
+                                          );
+                                          return;
+                                        }
+                                      } else {
+                                        if (!isWithinFiveMinutes(
+                                          DateTime.parse(widget.job.endDate!),
+                                          widget.job.endTime!,
+                                          clock!,
+                                        )) {
+                                          Customalerts.errorAlert(
+                                            title: "Can't Clock Out",
+                                            body:
+                                                "Please clock Out before/after of 5 minutes from end time",
+                                          );
+                                          return;
+                                        }
+                                      }
                                       HomeController hctrl = Get.find();
 
                                       String endPoint =
@@ -911,22 +960,16 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                         endpoint: endPoint,
                                         body: {
                                           if (breakTimes.isNotEmpty)
-                                            "break_start":
-                                                breakTimes.first.startTime
-                                                    .toUtc()
-                                                    .toString(),
-                                          // DateFormat(
-                                          //   "yyyy-MM-dd hh:mm A",
-                                          // ).format(breakTimes.first.startTime),
+                                            "break_start": DateFormat(
+                                              "yyyy-MM-dd hh:mm a",
+                                            ).format(
+                                              breakTimes.first.startTime,
+                                            ),
                                           if (breakTimes.isNotEmpty)
-                                            "break_end":
-                                                breakTimes.first.endTime
-                                                    .toUtc()
-                                                    .toString(),
+                                            "break_end": DateFormat(
+                                              "yyyy-MM-dd hh:mm a",
+                                            ).format(breakTimes.first.endTime),
 
-                                          // DateFormat(
-                                          //   "yyyy-MM-dd hh:mm A",
-                                          // ).format(breakTimes.first.endTime),
                                           "employee_id": hctrl.user!.employeeId,
                                           if (widget
                                               .job
@@ -938,10 +981,9 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                               .job
                                               .scheduleLogs!
                                               .isNotEmpty)
-                                            "clock_out_at":
-                                                clock!.toUtc().toString(),
-                                          // DateFormat(
-                                          //   "yyyy-MM-dd hh:mm A",
+                                            "clock_out_at": clock.toString(),
+                                          //  DateFormat(
+                                          //   "yyyy-MM-dd hh:mm a",
                                           // ).format(clock!),
                                           if (widget
                                               .job
