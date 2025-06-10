@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/get_core.dart';
+import 'package:hr_app/Screens/DashboardScreen/Service/Controller.dart';
 import 'package:hr_app/Screens/TimeLogDetailScreen/Models/TimeLogModel.dart';
 import 'package:intl/intl.dart';
 import 'package:hr_app/utils/Colors.dart';
@@ -33,8 +36,9 @@ class _TimeLogDetailsScreenState extends State<TimeLogDetailsScreen> {
     });
 
     try {
+      HomeController hctrl = Get.put(HomeController());
       await ApiService.request(
-        endpoint: "/schedule-logs/${widget.logId}",
+        endpoint: "/schedule-logs/${widget.logId}}",
         method: Api.GET,
         onSuccess: (data) {
           if (data.data != null) {

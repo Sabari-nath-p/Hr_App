@@ -76,7 +76,7 @@ class scheduleCard extends StatelessWidget {
               Text(
                 DateFormat(
                   "dd MMM yyyy, EEE",
-                ).format(DateTime.parse(job.startDate!)),
+                ).format(DateTime.parse(job.startDate!).toLocal()),
                 style: TextStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600,

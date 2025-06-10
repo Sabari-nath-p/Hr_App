@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:hr_app/Screens/DashboardScreen/Service/Controller.dart';
 import 'package:hr_app/utils/Colors.dart';
+import 'package:hr_app/utils/CustomAlerts.dart';
 import 'package:hr_app/utils/apiHandler.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Work Summary Model
 class WorkSummaryModel {
@@ -88,15 +91,25 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
     fetchWorkSummary();
   }
 
+  // Helper method to format date for API
+  String _formatDateForApi(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(date);
+  }
+
   fetchWorkSummary() async {
     setState(() {
       pageLoading = true;
     });
+    HomeController hctrl = Get.put(HomeController());
+
+    // Build the API endpoint with date parameters
+    String endpoint = "/time-sheets/stats?employee_id=${hctrl.user.employeeId}";
+    endpoint += "&start_date=${_formatDateForApi(selectedStartDate)}";
+    endpoint += "&end_date=${_formatDateForApi(selectedEndDate)}";
 
     await ApiService.request(
-      endpoint: "/time-sheets/stats", // Replace with your actual endpoint
+      endpoint: endpoint,
       method: Api.GET,
-
       onSuccess: (data) {
         print(data.data);
         workSummary = WorkSummaryModel.fromJson(data.data);
@@ -107,10 +120,10 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
       onError: (error) {
         // For demo purposes, using the provided sample data
         workSummary = WorkSummaryModel(
-          totalDurationWorked: 960,
-          totalDurationOvertime: 60,
-          totalPayWorked: 2903.2,
-          totalPayOvertime: 216.78,
+          totalDurationWorked: 0,
+          totalDurationOvertime: 0,
+          totalPayWorked: 0,
+          totalPayOvertime: 0,
           paidCount: 1,
           notPaidCount: 0,
         );
@@ -122,36 +135,341 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
   }
 
   Future<void> _selectDateRange() async {
-    DateTimeRange? picked = await showDateRangePicker(
+    DateTime tempStartDate = selectedStartDate;
+    DateTime tempEndDate = selectedEndDate;
+
+    await showDialog(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: selectedStartDate,
-        end: selectedEndDate,
-      ),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: const Color(0xFF2D5F3F),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              contentPadding: EdgeInsets.all(24.w),
+              title: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2D5F3F).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Icon(
+                      Icons.date_range_outlined,
+                      color: const Color(0xFF2D5F3F),
+                      size: 20.sp,
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    'Select Date Range',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Start Date Section
+                  Container(
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Start Date',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        GestureDetector(
+                          onTap: () async {
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: tempStartDate,
+                              firstDate: DateTime(2020),
+                              lastDate: tempEndDate,
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: const Color(0xFF2D5F3F),
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: Colors.black,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                tempStartDate = picked;
+                              });
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 12.h,
+                              horizontal: 16.w,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: const Color(0xFF2D5F3F).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat(
+                                    'MMM dd, yyyy',
+                                  ).format(tempStartDate),
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF2D5F3F),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  color: const Color(0xFF2D5F3F),
+                                  size: 18.sp,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 16.h),
+
+                  // End Date Section
+                  Container(
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'End Date',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        GestureDetector(
+                          onTap: () async {
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: tempEndDate,
+                              firstDate: tempStartDate,
+                              lastDate: DateTime.now(),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: const Color(0xFF2D5F3F),
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: Colors.black,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                tempEndDate = picked;
+                              });
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 12.h,
+                              horizontal: 16.w,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: const Color(0xFF2D5F3F).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat(
+                                    'MMM dd, yyyy',
+                                  ).format(tempEndDate),
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF2D5F3F),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  color: const Color(0xFF2D5F3F),
+                                  size: 18.sp,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 20.h),
+
+                  // Quick Select Options
+                  Text(
+                    'Quick Select',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  Wrap(
+                    spacing: 8.w,
+                    runSpacing: 8.h,
+                    children: [
+                      _buildQuickSelectChip('Last 7 Days', () {
+                        setDialogState(() {
+                          tempEndDate = DateTime.now();
+                          tempStartDate = DateTime.now().subtract(
+                            Duration(days: 7),
+                          );
+                        });
+                      }),
+                      _buildQuickSelectChip('Last 30 Days', () {
+                        setDialogState(() {
+                          tempEndDate = DateTime.now();
+                          tempStartDate = DateTime.now().subtract(
+                            Duration(days: 30),
+                          );
+                        });
+                      }),
+                      _buildQuickSelectChip('This Month', () {
+                        DateTime now = DateTime.now();
+                        setDialogState(() {
+                          tempStartDate = DateTime(now.year, now.month, 1);
+                          tempEndDate = DateTime(now.year, now.month + 1, 0);
+                        });
+                      }),
+                      _buildQuickSelectChip('Last Month', () {
+                        DateTime now = DateTime.now();
+                        DateTime lastMonth = DateTime(
+                          now.year,
+                          now.month - 1,
+                          1,
+                        );
+                        setDialogState(() {
+                          tempStartDate = lastMonth;
+                          tempEndDate = DateTime(now.year, now.month, 0);
+                        });
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(fontSize: 16.sp, color: Colors.grey[600]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      selectedStartDate = tempStartDate;
+                      selectedEndDate = tempEndDate;
+                    });
+                    Navigator.of(context).pop();
+                    fetchWorkSummary();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2D5F3F),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 24.w,
+                      vertical: 12.h,
+                    ),
+                  ),
+                  child: Text(
+                    'Apply',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
 
-    if (picked != null) {
-      setState(() {
-        selectedStartDate = picked.start;
-        selectedEndDate = picked.end;
-      });
-      fetchWorkSummary();
-    }
+  Widget _buildQuickSelectChip(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D5F3F).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: const Color(0xFF2D5F3F).withOpacity(0.3)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF2D5F3F),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSummaryCard({
@@ -339,34 +657,6 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // backgroundColor: Colors.grey[50],
-      // appBar: AppBar(
-      //   backgroundColor: Colors.white,
-      //   elevation: 0,
-      //   leading: IconButton(
-      //     icon: Icon(Icons.arrow_back_ios, color: Colors.black, size: 20.sp),
-      //     onPressed: () => Navigator.pop(context),
-      //   ),
-      //   title: Text(
-      //     'Work Summary',
-      //     style: TextStyle(
-      //       color: Colors.black,
-      //       fontSize: 18.sp,
-      //       fontWeight: FontWeight.w500,
-      //     ),
-      //   ),
-      //   centerTitle: true,
-      //   actions: [
-      //     IconButton(
-      //       icon: Icon(
-      //         Icons.date_range_outlined,
-      //         color: Colors.black,
-      //         size: 24.sp,
-      //       ),
-      //       onPressed: _selectDateRange,
-      //     ),
-      //   ],
-      // ),
       child:
           (pageLoading)
               ? Center(
@@ -381,38 +671,62 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Date Range Display
-                    if (false)
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(16.w),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F4F0),
-                          borderRadius: BorderRadius.circular(8.r),
-                          border: Border.all(
-                            color: const Color(0xFF4A7C59).withOpacity(0.2),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_outlined,
-                              color: const Color(0xFF4A7C59),
-                              size: 16.sp,
-                            ),
-                            SizedBox(width: 8.w),
-                            Text(
-                              '${DateFormat("MMM dd, yyyy").format(selectedStartDate)} - ${DateFormat("MMM dd, yyyy").format(selectedEndDate)}',
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF4A7C59),
-                              ),
-                            ),
-                          ],
+                    // Date Range Display with Edit Button
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16.w),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4F0),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: const Color(0xFF4A7C59).withOpacity(0.2),
                         ),
                       ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_outlined,
+                                  color: const Color(0xFF4A7C59),
+                                  size: 16.sp,
+                                ),
+                                SizedBox(width: 8.w),
+                                Flexible(
+                                  child: Text(
+                                    '${DateFormat("MMM dd, yyyy").format(selectedStartDate)} - ${DateFormat("MMM dd, yyyy").format(selectedEndDate)}',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF4A7C59),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _selectDateRange,
+                            child: Container(
+                              padding: EdgeInsets.all(6.w),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4A7C59),
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                color: Colors.white,
+                                size: 16.sp,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                     SizedBox(height: 24.h),
 
@@ -612,10 +926,40 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: fetchWorkSummary,
-                        icon: Icon(Icons.refresh_outlined, size: 18.sp),
+                        onPressed: () async {
+                          HomeController hctrl = Get.find();
+                          String endpoint =
+                              "/time-sheets/employee?employee_id=${hctrl.user.employeeId}";
+                          endpoint +=
+                              "&start_date=${_formatDateForApi(selectedStartDate)}";
+                          endpoint +=
+                              "&end_date=${_formatDateForApi(selectedEndDate)}";
+
+                          await ApiService.request(
+                            endpoint: endpoint,
+                            method: Api.GET,
+                            onSuccess: (data) {
+                              if (data.data["data"].isNotEmpty) {
+                                var id = data.data["data"][0]["id"];
+                                launchUrl(
+                                  Uri.parse(
+                                    ApiService.baseUrl + "/time-sheets/$id/pdf",
+                                  ),
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } else {
+                                Customalerts.warningAlert(
+                                  title: "No Slip Found",
+                                  body:
+                                      "No time sheet proccess during the selected time frame",
+                                );
+                              }
+                            },
+                          );
+                        },
+                        icon: Icon(Icons.download_outlined, size: 18.sp),
                         label: Text(
-                          'Refresh Data',
+                          'Download Paysheet',
                           style: TextStyle(
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w600,

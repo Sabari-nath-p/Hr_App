@@ -160,7 +160,7 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     DateTime? startTime;
     DateTime? endTime;
     DateTime now = clock ?? DateTime.now();
-
+    bool isCheck = false;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -490,24 +490,60 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                       ),
 
                       SizedBox(height: 24.h),
-
+                      Row(
+                        children: [
+                          Checkbox(
+                            checkColor: Colors.white,
+                            activeColor: AppColors.primaryColor,
+                            value: isCheck,
+                            onChanged: (Value) {
+                              setDialogState(() {
+                                isCheck = !isCheck;
+                              });
+                            },
+                          ),
+                          Text(
+                            "I agree to continue without break time",
+                            style: TextStyle(fontSize: 11.sp),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 24.h),
                       // Add Break Button
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed:
-                              startTime != null &&
-                                      endTime != null &&
-                                      endTime!.isAfter(startTime!)
+                              (startTime == null && endTime == null) ||
+                                      ((startTime != null && endTime != null) &&
+                                          endTime!.isAfter(startTime!))
                                   ? () {
-                                    _handleBreakTimeAdd(
-                                      startTime!,
-                                      endTime!,
-                                      _breakNotesController.text.trim(),
-                                    );
-                                    Navigator.pop(context);
+                                    if (startTime != null && endTime != null)
+                                      _handleBreakTimeAdd(
+                                        startTime!,
+                                        endTime!,
+                                        _breakNotesController.text.trim(),
+                                      );
+
+                                    if (breakTimes.isNotEmpty || isCheck) {
+                                      clockOut();
+                                      Navigator.pop(context);
+                                    } else {
+                                      print("working here");
+                                      Customalerts.warningAlert(
+                                        title: "Confirm Check",
+                                        body:
+                                            "Are you sure want to confrim without breaktime",
+                                      );
+                                    }
                                   }
-                                  : null,
+                                  : () {
+                                    Customalerts.warningAlert(
+                                      title: "Invalid Time",
+                                      body:
+                                          "Please add proper start time and end time of the break",
+                                    );
+                                  },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2D5F3F),
                             foregroundColor: Colors.white,
@@ -518,8 +554,9 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                             elevation: 0,
                           ),
                           child: Text(
-                            'Add Break Time',
+                            'Clock Out',
                             style: TextStyle(
+                              color: Colors.white,
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w600,
                             ),
@@ -594,8 +631,8 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     );
 
     // Create time window: 5 minutes before and after combined time
-    final fiveMinutesBefore = combinedDateTime.subtract(Duration(minutes: 5));
-    final fiveMinutesAfter = combinedDateTime.add(Duration(minutes: 5));
+    final fiveMinutesBefore = combinedDateTime.subtract(Duration(minutes: 30));
+    final fiveMinutesAfter = combinedDateTime.add(Duration(minutes: 30));
 
     return current.isAfter(fiveMinutesBefore) &&
         current.isBefore(fiveMinutesAfter);
@@ -927,23 +964,13 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                           Customalerts.errorAlert(
                                             title: "Can't Clock In",
                                             body:
-                                                "Please clock in before/after of 5 minutes from start time",
+                                                "Please clock in before/after of 30 minutes from start time",
                                           );
                                           return;
                                         }
                                       } else {
-                                        if (!isWithinFiveMinutes(
-                                          DateTime.parse(widget.job.endDate!),
-                                          widget.job.endTime!,
-                                          clock!,
-                                        )) {
-                                          Customalerts.errorAlert(
-                                            title: "Can't Clock Out",
-                                            body:
-                                                "Please clock Out before/after of 5 minutes from end time",
-                                          );
-                                          return;
-                                        }
+                                        _showBreakTimeDialog();
+                                        return;
                                       }
                                       HomeController hctrl = Get.find();
 
@@ -970,18 +997,18 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                               "yyyy-MM-dd hh:mm a",
                                             ).format(breakTimes.first.endTime),
 
+                                          if (widget
+                                              .job
+                                              .scheduleLogs!
+                                              .isNotEmpty)
+                                            "clock_out_at":
+                                                clock!.toUtc().toString(),
                                           "employee_id": hctrl.user!.employeeId,
                                           if (widget
                                               .job
                                               .scheduleLogs!
                                               .isNotEmpty)
                                             "break_time": totalBreakMinutes,
-
-                                          if (widget
-                                              .job
-                                              .scheduleLogs!
-                                              .isNotEmpty)
-                                            "clock_out_at": clock.toString(),
                                           //  DateFormat(
                                           //   "yyyy-MM-dd hh:mm a",
                                           // ).format(clock!),
@@ -1033,7 +1060,7 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                               Customalerts.errorAlert(
                                                 title: "Check-In failed",
                                                 body:
-                                                    "Already clocked in or schedule already exists for this date, or employee has an open schedule log.",
+                                                    data.data["message"] ?? "",
                                               );
                                             else {
                                               Customalerts.errorAlert(
@@ -1087,42 +1114,42 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                                 SizedBox(width: 12.w),
 
                                 // Break Time button
-                                if (!widget.job.scheduleLogs!.isEmpty)
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: _showBreakTimeDialog,
-                                      icon: Icon(
-                                        Icons.coffee_outlined,
-                                        size: 18.sp,
-                                        color: const Color(0xFF2D5F3F),
-                                      ),
-                                      label: Text(
-                                        "Add Break",
-                                        style: TextStyle(
-                                          fontSize: 16.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF2D5F3F),
-                                        ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF2D5F3F,
-                                        ),
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: 16.h,
-                                        ),
-                                        side: BorderSide(
-                                          color: const Color(0xFF2D5F3F),
-                                          width: 1.5,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8.r,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                // if (!widget.job.scheduleLogs!.isEmpty)
+                                //   Expanded(
+                                //     child: OutlinedButton.icon(
+                                //       onPressed: _showBreakTimeDialog,
+                                //       icon: Icon(
+                                //         Icons.coffee_outlined,
+                                //         size: 18.sp,
+                                //         color: const Color(0xFF2D5F3F),
+                                //       ),
+                                //       label: Text(
+                                //         "Add Break",
+                                //         style: TextStyle(
+                                //           fontSize: 16.sp,
+                                //           fontWeight: FontWeight.w600,
+                                //           color: const Color(0xFF2D5F3F),
+                                //         ),
+                                //       ),
+                                //       style: OutlinedButton.styleFrom(
+                                //         foregroundColor: const Color(
+                                //           0xFF2D5F3F,
+                                //         ),
+                                //         padding: EdgeInsets.symmetric(
+                                //           vertical: 16.h,
+                                //         ),
+                                //         side: BorderSide(
+                                //           color: const Color(0xFF2D5F3F),
+                                //           width: 1.5,
+                                //         ),
+                                //         shape: RoundedRectangleBorder(
+                                //           borderRadius: BorderRadius.circular(
+                                //             8.r,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ),
+                                //   ),
                               ],
                             ),
                           ],
@@ -1130,8 +1157,7 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
                       ),
 
                       // Break times list
-                      _buildBreakTimesList(),
-
+                      //   _buildBreakTimesList(),
                       SizedBox(height: 20.h),
                     ],
                   ),
@@ -1145,5 +1171,60 @@ class _TimeClockScreenState extends State<TimeClockScreen> {
     _notesController.dispose();
     _breakNotesController.dispose();
     super.dispose();
+  }
+
+  void clockOut() async {
+    HomeController hctrl = Get.find();
+    String endPoint = "/schedule-logs/clock-out";
+    setState(() {
+      loading = true;
+    });
+    await ApiService.request(
+      endpoint: endPoint,
+      body: {
+        if (breakTimes.isNotEmpty)
+          "break_start": DateFormat(
+            "yyyy-MM-dd hh:mm a",
+          ).format(breakTimes.first.startTime),
+        if (breakTimes.isNotEmpty)
+          "break_end": DateFormat(
+            "yyyy-MM-dd hh:mm a",
+          ).format(breakTimes.first.endTime),
+        "employee_id": hctrl.user!.employeeId,
+        if (widget.job.scheduleLogs!.isNotEmpty)
+          "break_time": totalBreakMinutes,
+        //  DateFormat(
+        //   "yyyy-MM-dd hh:mm a",
+        // ).format(clock!),
+        "schedule_log_id": widget.job.scheduleLogs!.first.id,
+        "note": _notesController.text.trim(),
+      },
+      onSuccess: (data) {
+        print(data.data);
+        if (data.statusCode == 200 || data.statusCode == 201) {
+          // Clear break times after successful clock out
+          if (widget.job.scheduleLogs!.isNotEmpty) {
+            breakTimes.clear();
+          }
+          Get.back();
+          hctrl.jobList.clear();
+          hctrl.fetchShedules();
+          Customalerts.successAlert(
+            title: "Check-Out Successful",
+            body:
+                "Clocked 'out' ${DateFormat("dd-M-yyyy : hh:mm:ss a").format(clock!)}",
+          );
+        } else {
+          Customalerts.errorAlert(
+            title: "Check-out failed",
+            body: data.data["message"],
+          );
+        }
+      },
+    );
+
+    setState(() {
+      loading = false;
+    });
   }
 }

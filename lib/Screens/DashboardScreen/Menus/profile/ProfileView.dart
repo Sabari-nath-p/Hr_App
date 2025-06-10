@@ -108,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(height: 12.h),
                   // _buildDetailRow('Employee ID', employeeId ?? 'N/A'),
                   // SizedBox(height: 12.h),
-                  _buildDetailRow('Company ID', companyId ?? 'N/A'),
+                  _buildDetailRow('Employee ID', employeeId ?? 'N/A'),
                   SizedBox(height: 12.h),
                   // _buildDetailRow('User ID', id ?? 'N/A'),
                 ],
